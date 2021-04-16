@@ -242,7 +242,7 @@ static struct process *sjf_schedule(void)
 			if(next->lifespan > cur->lifespan)
 				next = cur;
 		}
-		list_del_init(&next->list); // next의 실행이 끝났으면 삭제함
+		list_del_init(&next->list); //readyqueue에서 process 분리
 	}	
 	
 	return next;
@@ -261,10 +261,53 @@ struct scheduler sjf_scheduler = {
 /***********************************************************************
  * SRTF scheduler
  ***********************************************************************/
+static struct process *srtf_schedule(void)
+{
+	/**
+	 * Implement your own SJF scheduler here.
+	 */
+	struct process *next = NULL;
+	// dump_status();
+
+	struct process *cur = NULL;
+	struct process *curn = NULL;
+
+	// current process의 상태가 wait이면 pick_next로 이동
+	if (!current || current->status == PROCESS_WAIT) {
+		goto pick_next;
+	}
+	
+	// age가 lifespan보다 작다면
+	if (current->age < current->lifespan) {
+			// current process를 다시 readyqueue 뒤에 붙여넣는다.
+			list_add_tail(&current->list,&readyqueue);
+
+		// return current;
+	}
+	
+	pick_next:
+	// readyqueue로 이동해서 비어있지 않다면 실행됨
+	if (!list_empty(&readyqueue)) {
+		// readyqueue에 process의 순번대로 next에 넣음
+		next = list_first_entry(&readyqueue, struct process, list);
+
+		list_for_each_entry_safe(cur,curn,&readyqueue,list){
+			// readyqueue를 순회하여 제일 작은 lifespan을 next에 넣음
+			if((next->lifespan-next->age) > (cur->lifespan-cur->age))
+				next = cur;
+		}
+
+		list_del_init(&next->list); //readyqueue에서 process 분리
+	}
+	return next;
+}
+
+
 struct scheduler srtf_scheduler = {
 	.name = "Shortest Remaining Time First",
 	.acquire = fcfs_acquire, /* Use the default FCFS acquire() */
 	.release = fcfs_release, /* Use the default FCFS release() */
+	.schedule = srtf_schedule
 	/* You need to check the newly created processes to implement SRTF.
 	 * Use @forked() callback to mark newly created processes */
 	/* Obviously, you should implement srtf_schedule() and attach it here */
