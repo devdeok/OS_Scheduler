@@ -137,8 +137,6 @@ void fcfs_release(int resource_id)
 	}
 }
 
-
-
 #include "sched.h"
 
 /***********************************************************************
@@ -174,7 +172,7 @@ static struct process *fifo_schedule(void)
 	}
 
 	/* The current process has remaining lifetime. Schedule it again */
-	if (current->age < current->lifespan) {
+	if (current->age < current->lifespan) { 
 		return current;
 	}
 
@@ -194,7 +192,7 @@ pick_next:
 		 * the framework will complain (assert) on process exit.
 		 */
 		list_del_init(&next->list);
-	}
+	}	
 
 	/* Return the next process to run */
 	return next;
@@ -209,7 +207,6 @@ struct scheduler fifo_scheduler = {
 	.schedule = fifo_schedule,
 };
 
-
 /***********************************************************************
  * SJF scheduler
  ***********************************************************************/
@@ -218,14 +215,44 @@ static struct process *sjf_schedule(void)
 	/**
 	 * Implement your own SJF scheduler here.
 	 */
-	return NULL;
+	struct process *next = NULL;
+
+	struct process *cur = NULL;
+	struct process *curn = NULL;
+	
+	// current process의 상태가 wait이면 pick_next로 이동
+	if (!current || current->status == PROCESS_WAIT) {
+		goto pick_next;
+	}
+	
+	// age가 lifespan보다 작다면 current를 return
+	if (current->age < current->lifespan) {
+		return current;
+	}
+
+	pick_next:
+	// readyqueue로 이동해서 비어있지 않다면 실행됨
+	if (!list_empty(&readyqueue)) {
+		// readyqueue에 process의 순번대로 next에 넣음
+		next = list_first_entry(&readyqueue, struct process, list);	
+
+		// 제일 작은 lifespan을 찾아서 next에 넣어주어야 함 
+		list_for_each_entry_safe(cur,curn,&readyqueue,list){
+			// readyqueue를 순회하여 제일 작은 lifespan을 next에 넣음
+			if(next->lifespan > cur->lifespan)
+				next = cur;
+		}
+		list_del_init(&next->list); // next의 실행이 끝났으면 삭제함
+	}	
+	
+	return next;
 }
 
 struct scheduler sjf_scheduler = {
 	.name = "Shortest-Job First",
 	.acquire = fcfs_acquire, /* Use the default FCFS acquire() */
 	.release = fcfs_release, /* Use the default FCFS release() */
-	.schedule = NULL,		 /* TODO: Assign sjf_schedule()
+	.schedule = sjf_schedule	/* TODO: Assign sjf_schedule()
 								to this function pointer to activate
 								SJF in the system */
 };
@@ -265,6 +292,8 @@ struct scheduler prio_scheduler = {
 	 * scheduler correct.
 	 */
 	/* Implement your own prio_schedule() and attach it here */
+
+
 };
 
 
@@ -278,6 +307,8 @@ struct scheduler pa_scheduler = {
 	 * scheduler correct.
 	 */
 	/* Implement your own prio_schedule() and attach it here */
+
+
 };
 
 
@@ -290,6 +321,8 @@ struct scheduler pcp_scheduler = {
 	 * Implement your own acqure/release function too to make priority
 	 * scheduler correct.
 	 */
+
+
 };
 
 
@@ -301,4 +334,7 @@ struct scheduler pip_scheduler = {
 	/**
 	 * Ditto
 	 */
+
+
+
 };
