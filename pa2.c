@@ -279,8 +279,8 @@ static struct process *srtf_schedule(void)
 	
 	// age가 lifespan보다 작다면
 	if (current->age < current->lifespan) {
-			// current process를 다시 readyqueue 뒤에 붙임
-			list_add_tail(&current->list,&readyqueue);
+			// current process를 다시 readyqueue에 붙임
+			list_add(&current->list,&readyqueue);
 			// return current;
 	}
 	
@@ -291,7 +291,7 @@ static struct process *srtf_schedule(void)
 		next = list_first_entry(&readyqueue, struct process, list);
 
 		list_for_each_entry_safe(cur,curn,&readyqueue,list){
-			// readyqueue를 순회하여 남은 lifespan이 제일 작은 process를 next에 넣음
+			// readyqueue를 순회하여 남은 lifespan 중 제일 작은 process를 next에 넣음
 			if((next->lifespan-next->age) > (cur->lifespan-cur->age))
 				next = cur;
 		}
@@ -334,12 +334,15 @@ static struct process *rr_schedule(void)
 	
 	// age가 lifespan보다 작다면
 	if (current->age < current->lifespan) {
+		// current가 한번 실행하고 다시 readyqueue에 붙임
+		// 한번만 실행했으므로 time quantum인 1 tick 만족
 		list_add_tail(&current->list,&readyqueue);
 	}
 	
 	pick_next:
 	// readyqueue로 이동해서 비어있지 않다면 실행됨
 	if (!list_empty(&readyqueue)) {
+		// fcfs처럼 차례로 실행
 		next = list_first_entry(&readyqueue, struct process, list);
 		list_del_init(&next->list);
 	}
@@ -359,14 +362,52 @@ struct scheduler rr_scheduler = {
 /***********************************************************************
  * Priority scheduler
  ***********************************************************************/
+static struct process *prio_schedule(void)
+{
+	/**
+	 * Implement your own SJF scheduler here.
+	 */
+	struct process *next = NULL;
+	// dump_status();
+
+	struct process *cur = NULL;
+	struct process *curn = NULL;
+
+	// current process의 상태가 wait이면 pick_next로 이동
+	if (!current || current->status == PROCESS_WAIT) {
+		goto pick_next;
+	}
+	
+	// age가 lifespan보다 작다면
+	if (current->age < current->lifespan) {
+		return current;
+	}
+	
+	pick_next:
+	// readyqueue로 이동해서 비어있지 않다면 실행됨
+	if (!list_empty(&readyqueue)) {
+		// fcfs처럼 차례로 실행
+		next = list_first_entry(&readyqueue, struct process, list);
+		list_for_each_entry_safe(cur,curn,&readyqueue,list){
+			if(next->prio < cur->prio){
+				next = cur;
+			}
+		}
+		list_del_init(&next->list);
+	}
+	return next;
+}
+
 struct scheduler prio_scheduler = {
 	.name = "Priority",
+	.acquire = fcfs_acquire,
+	.release = fcfs_release,
+	.schedule = prio_schedule
 	/**
 	 * Implement your own acqure/release function to make priority
 	 * scheduler correct.
 	 */
 	/* Implement your own prio_schedule() and attach it here */
-
 
 };
 
