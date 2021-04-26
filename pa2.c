@@ -368,6 +368,7 @@ void prio_release(int resource_id){
 	assert(r->owner == current);
 	r->owner = NULL;
 
+	// waitqueue에 있는 process들 중 제일 priority가 높은거 찾기
 	if (!list_empty(&r->waitqueue)) {
 		struct process *waiter = list_first_entry(&r->waitqueue, struct process, list);
 
@@ -433,7 +434,6 @@ struct scheduler prio_scheduler = {
 	/* Implement your own prio_schedule() and attach it here */
 };
 
-
 /***********************************************************************
  * Priority scheduler with aging
  ***********************************************************************/
@@ -451,21 +451,27 @@ static struct process *pa_schedule(void){
 	/* The current process has remaining lifetime. Schedule it again */
 	if (current->age < current->lifespan) { 
 		list_add_tail(&current->list,&readyqueue);
+		current->prio = current->prio_orig;
 	}
 
-pick_next:
-	/* Let's pick a new process to run next */
-	if (!list_empty(&readyqueue)) {
-		next = list_first_entry(&readyqueue, struct process, list);
-		
-		list_for_each_entry_safe(cur,curn,&readyqueue,list){
-			if(next->prio < cur->prio){
-				next->prio++;
-				next = cur;
+	pick_next:
+		/* Let's pick a new process to run next */
+		if (!list_empty(&readyqueue)) {
+			next = list_first_entry(&readyqueue, struct process, list);
+			
+			
+
+			list_for_each_entry_safe(cur,curn,&readyqueue,list){
+				cur->prio++;
+				// printf("pid : %d prio : %d prio_orig : %d\n",
+				// 	cur->pid,cur->prio,cur->prio_orig);
+
+				if(next->prio < cur->prio){
+					next = cur;
+				}
 			}
-		}
-		list_del_init(&next->list);
-	}	
+			list_del_init(&next->list);
+		}	
 
 	/* Return the next process to run */
 	return next;
@@ -475,7 +481,7 @@ pick_next:
 struct scheduler pa_scheduler = {
 	.name = "Priority + aging",
 	.acquire = fcfs_acquire,
-	.release = fcfs_release,
+	.release = prio_release,
 	.schedule = pa_schedule
 	/**
 	 * Implement your own acqure/release function to make priority
@@ -521,19 +527,44 @@ pick_next:
 struct scheduler pcp_scheduler = {
 	.name = "Priority + PCP Protocol",
 	.acquire = fcfs_acquire,
-	.release = fcfs_release,
+	.release = prio_release,
 	.schedule = pcp_schedule
 	/**
 	 * Implement your own acqure/release function too to make priority
 	 * scheduler correct.
 	 */
-	};
+};
 
 
 
 /***********************************************************************
  * Priority scheduler with priority inheritance protocol
  ***********************************************************************/
+void pip_release(int resource_id){
+	struct resource *r = resources + resource_id;
+
+	struct process *cur, *curn;
+
+	assert(r->owner == current);
+	r->owner = NULL;
+
+	// waitqueue에 있는 process들 중 제일 priority가 높은거 찾기
+	if (!list_empty(&r->waitqueue)) {
+		struct process *waiter = list_first_entry(&r->waitqueue, struct process, list);
+
+		list_for_each_entry_safe(cur,curn,&r->waitqueue,list){
+			if(waiter->prio < cur->prio){
+				waiter = cur;
+			}
+		}
+
+		assert(waiter->status == PROCESS_WAIT);
+		list_del_init(&waiter->list);
+		waiter->status = PROCESS_READY;
+		list_add_tail(&waiter->list, &readyqueue);
+	}
+}
+
 static struct process *pip_schedule(void){
 	struct process *next = NULL;
 	// dump_status();
@@ -566,7 +597,7 @@ pick_next:
 struct scheduler pip_scheduler = {
 	.name = "Priority + PIP Protocol",
 	.acquire = fcfs_acquire,
-	.release = fcfs_release,
+	.release = pip_release,
 	.schedule = pip_schedule
 	/**
 	 * Ditto
