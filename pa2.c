@@ -410,7 +410,6 @@ static struct process *prio_schedule(void){
 	if (!list_empty(&readyqueue)) {
 		// readyqueue에 있는 process중에 priority가 제일 높은 process를 next에 넣어줌
 		next = list_first_entry(&readyqueue, struct process, list);
-
 		list_for_each_entry_safe(cur,curn,&readyqueue,list){
 			if(next->prio < cur->prio){
 				next = cur;
@@ -496,7 +495,6 @@ bool pcp_acquire(int resource_id){
 	if (!r->owner) {
 		r->owner = current;
 		current->prio=MAX_PRIO;
-
 		return true;
 	}
 	current->status = PROCESS_WAIT;
@@ -504,10 +502,29 @@ bool pcp_acquire(int resource_id){
 	return false;
 }
 
+void pcp_release(int resource_id)
+{
+	struct resource *r = resources + resource_id;
+	assert(r->owner == current);
+
+	r->owner->prio = r->owner->prio_orig;
+	r->owner = NULL;
+
+	if (!list_empty(&r->waitqueue)) {
+		struct process *waiter =
+				list_first_entry(&r->waitqueue, struct process, list);
+
+		assert(waiter->status == PROCESS_WAIT);
+		list_del_init(&waiter->list);
+		waiter->status = PROCESS_READY;
+		list_add_tail(&waiter->list, &readyqueue);
+	}
+}
+
 struct scheduler pcp_scheduler = {
 	.name = "Priority + PCP Protocol",
 	.acquire = pcp_acquire,
-	.release = prio_release,
+	.release = pcp_release,
 	.schedule = prio_schedule
 	/**
 	 * Implement your own acqure/release function too to make priority
