@@ -220,16 +220,17 @@ static struct process *sjf_schedule(void)
 	struct process *cur = NULL;
 	struct process *curn = NULL;
 	
-	// current process의 상태가 wait이면 pick_next로 이동
+	// 현재 process 상태가 wait이면 pick_next로 이동
 	if (!current || current->status == PROCESS_WAIT) {
 		goto pick_next;
 	}
 	
-	// age가 lifespan보다 작다면 current를 return
+	// 현재 process를 계속 실행
 	if (current->age < current->lifespan) {
 		return current;
 	}
 
+	// 다음에 실행할 process를 분류함 -> 초기 lifespan이 제일 짧은 process
 	pick_next:
 	// readyqueue로 이동해서 비어있지 않다면 실행됨
 	if (!list_empty(&readyqueue)) {
@@ -277,15 +278,13 @@ static struct process *srtf_schedule(void)
 		goto pick_next;
 	}
 	
-	// age가 lifespan보다 작다면
+	// 현재 process를 readyqueue 제일 끝에 붙임
 	if (current->age < current->lifespan) {
-			// current process를 다시 readyqueue에 붙임
 			list_add_tail(&current->list,&readyqueue);
-			// return current;
 	}
 	
+	// 다음 실행할 process 분류 -> 남은 lifespan이 제일 짧은 process
 	pick_next:
-	// readyqueue로 이동해서 비어있지 않다면 실행됨
 	if (!list_empty(&readyqueue)) {
 		// readyqueue에 process의 순번대로 next에 넣음
 		next = list_first_entry(&readyqueue, struct process, list);
@@ -338,11 +337,10 @@ static struct process *rr_schedule(void)
 		// 한번만 실행했으므로 time quantum인 1 tick 만족
 		list_add_tail(&current->list,&readyqueue);
 	}
-	
+
 	pick_next:
-	// readyqueue로 이동해서 비어있지 않다면 실행됨
 	if (!list_empty(&readyqueue)) {
-		// fcfs처럼 차례로 실행
+		// fifo처럼 차례로 실행
 		next = list_first_entry(&readyqueue, struct process, list);
 		list_del_init(&next->list);
 	}
@@ -362,8 +360,31 @@ struct scheduler rr_scheduler = {
 /***********************************************************************
  * Priority scheduler
  ***********************************************************************/
-static struct process *prio_schedule(void)
-{  
+void prio_release(int resource_id){
+	struct resource *r = resources + resource_id;
+
+	struct process *cur, *curn;
+
+	assert(r->owner == current);
+	r->owner = NULL;
+
+	if (!list_empty(&r->waitqueue)) {
+		struct process *waiter = list_first_entry(&r->waitqueue, struct process, list);
+
+		list_for_each_entry_safe(cur,curn,&r->waitqueue,list){
+			if(waiter->prio < cur->prio){
+				waiter = cur;
+			}
+		}
+
+		assert(waiter->status == PROCESS_WAIT);
+		list_del_init(&waiter->list);
+		waiter->status = PROCESS_READY;
+		list_add_tail(&waiter->list, &readyqueue);
+	}
+}
+
+static struct process *prio_schedule(void){  
 	/**
 	 * Implement your own SJF scheduler here.
 	 */
@@ -374,9 +395,6 @@ static struct process *prio_schedule(void)
 	struct process *cur = NULL;
 	struct process *curn = NULL;
 
-	struct process *cnext = NULL; //?
-	int count = 0; // 이게 진짜 뭔지 모르겠네
-
 	// current process의 상태가 wait이면 pick_next로 이동
 	if (!current || current->status == PROCESS_WAIT) {
 		goto pick_next;
@@ -386,11 +404,13 @@ static struct process *prio_schedule(void)
 		list_add_tail(&current->list,&readyqueue);
 	}
 	
+	// 다음에 실행할 process 분류 -> 우선순위가 높은 process
 	pick_next:
 	// readyqueu가 비어있지 않다면 실행
 	if (!list_empty(&readyqueue)) {
 		// readyqueue에 있는 process중에 priority가 제일 높은 process를 next에 넣어줌
 		next = list_first_entry(&readyqueue, struct process, list);
+
 		list_for_each_entry_safe(cur,curn,&readyqueue,list){
 			if(next->prio < cur->prio){
 				next = cur;
@@ -404,14 +424,13 @@ static struct process *prio_schedule(void)
 struct scheduler prio_scheduler = {
 	.name = "Priority",
 	.acquire = fcfs_acquire,
-	.release = fcfs_release,
+	.release = prio_release,
 	.schedule = prio_schedule
 	/**
 	 * Implement your own acqure/release function to make priority
 	 * scheduler correct.
 	 */
 	/* Implement your own prio_schedule() and attach it here */
-
 };
 
 
@@ -438,6 +457,7 @@ pick_next:
 	/* Let's pick a new process to run next */
 	if (!list_empty(&readyqueue)) {
 		next = list_first_entry(&readyqueue, struct process, list);
+		
 		list_for_each_entry_safe(cur,curn,&readyqueue,list){
 			if(next->prio < cur->prio){
 				next->prio++;
@@ -451,6 +471,7 @@ pick_next:
 	return next;
 }
 
+// readyqueue에 있는 모든 process는 priority boost 1씩 받는다.
 struct scheduler pa_scheduler = {
 	.name = "Priority + aging",
 	.acquire = fcfs_acquire,
