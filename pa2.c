@@ -207,11 +207,12 @@ struct scheduler fifo_scheduler = {
 	.schedule = fifo_schedule,
 };
 
+
+
 /***********************************************************************
  * SJF scheduler
  ***********************************************************************/
-static struct process *sjf_schedule(void)
-{
+static struct process *sjf_schedule(void){
 	/**
 	 * Implement your own SJF scheduler here.
 	 */
@@ -259,11 +260,11 @@ struct scheduler sjf_scheduler = {
 };
 
 
+
 /***********************************************************************
  * SRTF scheduler
  ***********************************************************************/
-static struct process *srtf_schedule(void)
-{
+static struct process *srtf_schedule(void){
 	/**
 	 * Implement your own srtf scheduler here.
 	 */
@@ -300,7 +301,6 @@ static struct process *srtf_schedule(void)
 	return next;
 }
 
-
 struct scheduler srtf_scheduler = {
 	.name = "Shortest Remaining Time First",
 	.acquire = fcfs_acquire, /* Use the default FCFS acquire() */
@@ -312,11 +312,11 @@ struct scheduler srtf_scheduler = {
 };
 
 
+
 /***********************************************************************
  * Round-robin scheduler
  ***********************************************************************/
-static struct process *rr_schedule(void)
-{
+static struct process *rr_schedule(void){
 	/**
 	 * Implement your own SJF scheduler here.
 	 */
@@ -357,14 +357,13 @@ struct scheduler rr_scheduler = {
 };
 
 
+
 /***********************************************************************
  * Priority scheduler
  ***********************************************************************/
 void prio_release(int resource_id){
 	struct resource *r = resources + resource_id;
-
 	struct process *cur, *curn;
-
 	assert(r->owner == current);
 	r->owner = NULL;
 
@@ -458,13 +457,8 @@ static struct process *pa_schedule(void){
 		/* Let's pick a new process to run next */
 		if (!list_empty(&readyqueue)) {
 			next = list_first_entry(&readyqueue, struct process, list);
-			
-			
-
 			list_for_each_entry_safe(cur,curn,&readyqueue,list){
 				cur->prio++;
-				// printf("pid : %d prio : %d prio_orig : %d\n",
-				// 	cur->pid,cur->prio,cur->prio_orig);
 
 				if(next->prio < cur->prio){
 					next = cur;
@@ -481,7 +475,7 @@ static struct process *pa_schedule(void){
 struct scheduler pa_scheduler = {
 	.name = "Priority + aging",
 	.acquire = fcfs_acquire,
-	.release = prio_release,
+	.release = fcfs_release,
 	.schedule = pa_schedule
 	/**
 	 * Implement your own acqure/release function to make priority
@@ -495,40 +489,26 @@ struct scheduler pa_scheduler = {
 /***********************************************************************
  * Priority scheduler with priority ceiling protocol
  ***********************************************************************/
-static struct process *pcp_schedule(void){
-	struct process *next = NULL;
-	// dump_status();
-	struct process *cur = NULL;
-	struct process *curn = NULL;
+bool pcp_acquire(int resource_id){
+	struct resource *r = resources + resource_id;
 
-	if (!current || current->status == PROCESS_WAIT) {
-		goto pick_next;
+	// resource의 owner가 없음
+	if (!r->owner) {
+		r->owner = current;
+		current->prio=MAX_PRIO;
+
+		return true;
 	}
-
-	/* The current process has remaining lifetime. Schedule it again */
-	if (current->age < current->lifespan) { 
-		list_add_tail(&current->list,&readyqueue);
-		// MAX_PRIO 이거 사용해서 priority를 높게 올려주기
-	}
-
-pick_next:
-	/* Let's pick a new process to run next */
-	if (!list_empty(&readyqueue)) {
-		next = list_first_entry(&readyqueue, struct process, list);
-		list_for_each_entry_safe(cur,curn,&readyqueue,list){
-			if(next->prio < cur->prio){
-				next = cur;
-			}
-		}
-		list_del_init(&next->list);
-	}	
+	current->status = PROCESS_WAIT;
+	list_add_tail(&current->list, &r->waitqueue);
+	return false;
 }
 
 struct scheduler pcp_scheduler = {
 	.name = "Priority + PCP Protocol",
-	.acquire = fcfs_acquire,
+	.acquire = pcp_acquire,
 	.release = prio_release,
-	.schedule = pcp_schedule
+	.schedule = prio_schedule
 	/**
 	 * Implement your own acqure/release function too to make priority
 	 * scheduler correct.
@@ -598,7 +578,7 @@ struct scheduler pip_scheduler = {
 	.name = "Priority + PIP Protocol",
 	.acquire = fcfs_acquire,
 	.release = pip_release,
-	.schedule = pip_schedule
+	.schedule = prio_schedule
 	/**
 	 * Ditto
 	 */
