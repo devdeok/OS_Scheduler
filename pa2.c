@@ -537,12 +537,27 @@ struct scheduler pcp_scheduler = {
 /***********************************************************************
  * Priority scheduler with priority inheritance protocol
  ***********************************************************************/
+bool pip_acquire(int resource_id){
+	struct resource *r = resources + resource_id;
+
+	// resource의 owner가 없음
+	if (!r->owner) {
+		r->owner = current;
+		return true;
+	}
+	current->status = PROCESS_WAIT;
+	r->owner->prio = current->prio;
+	list_add_tail(&current->list, &r->waitqueue);
+	return false;
+}
+
 void pip_release(int resource_id){
 	struct resource *r = resources + resource_id;
 
 	struct process *cur, *curn;
 
 	assert(r->owner == current);
+	current->prio = current->prio_orig;
 	r->owner = NULL;
 
 	// waitqueue에 있는 process들 중 제일 priority가 높은거 찾기
@@ -562,38 +577,10 @@ void pip_release(int resource_id){
 	}
 }
 
-static struct process *pip_schedule(void){
-	struct process *next = NULL;
-	// dump_status();
-	struct process *cur = NULL;
-	struct process *curn = NULL;
-
-	if (!current || current->status == PROCESS_WAIT) {
-		goto pick_next;
-	}
-
-	if (current->age < current->lifespan) { 
-		list_add_tail(&current->list,&readyqueue);
-	}
-
-pick_next:
-	if (!list_empty(&readyqueue)) {
-		next = list_first_entry(&readyqueue, struct process, list);
-		list_for_each_entry_safe(cur,curn,&readyqueue,list){
-			if(next->prio < cur->prio){
-				next = cur;
-			}
-		}
-		list_del_init(&next->list);
-	}	
-
-	/* Return the next process to run */
-	return next;
-}
 
 struct scheduler pip_scheduler = {
 	.name = "Priority + PIP Protocol",
-	.acquire = fcfs_acquire,
+	.acquire = pip_acquire,
 	.release = pip_release,
 	.schedule = prio_schedule
 	/**
