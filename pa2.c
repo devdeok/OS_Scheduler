@@ -280,7 +280,7 @@ static struct process *srtf_schedule(void)
 	// age가 lifespan보다 작다면
 	if (current->age < current->lifespan) {
 			// current process를 다시 readyqueue에 붙임
-			list_add(&current->list,&readyqueue);
+			list_add_tail(&current->list,&readyqueue);
 			// return current;
 	}
 	
@@ -363,30 +363,33 @@ struct scheduler rr_scheduler = {
  * Priority scheduler
  ***********************************************************************/
 static struct process *prio_schedule(void)
-{
+{  
 	/**
 	 * Implement your own SJF scheduler here.
 	 */
 	struct process *next = NULL;
 	// dump_status();
-
+	// acquire 1 0 2 -> 0번 했을 때 resource#1을 2 tick 사용
+	
 	struct process *cur = NULL;
 	struct process *curn = NULL;
+
+	struct process *cnext = NULL; //?
+	int count = 0; // 이게 진짜 뭔지 모르겠네
 
 	// current process의 상태가 wait이면 pick_next로 이동
 	if (!current || current->status == PROCESS_WAIT) {
 		goto pick_next;
 	}
 	
-	// age가 lifespan보다 작다면
 	if (current->age < current->lifespan) {
-		return current;
+		list_add_tail(&current->list,&readyqueue);
 	}
 	
 	pick_next:
-	// readyqueue로 이동해서 비어있지 않다면 실행됨
+	// readyqueu가 비어있지 않다면 실행
 	if (!list_empty(&readyqueue)) {
-		// fcfs처럼 차례로 실행
+		// readyqueue에 있는 process중에 priority가 제일 높은 process를 next에 넣어줌
 		next = list_first_entry(&readyqueue, struct process, list);
 		list_for_each_entry_safe(cur,curn,&readyqueue,list){
 			if(next->prio < cur->prio){
@@ -415,41 +418,136 @@ struct scheduler prio_scheduler = {
 /***********************************************************************
  * Priority scheduler with aging
  ***********************************************************************/
+
+static struct process *pa_schedule(void){
+	struct process *next = NULL;
+	// dump_status();
+	struct process *cur = NULL;
+	struct process *curn = NULL;
+
+	if (!current || current->status == PROCESS_WAIT) {
+		goto pick_next;
+	}
+
+	/* The current process has remaining lifetime. Schedule it again */
+	if (current->age < current->lifespan) { 
+		list_add_tail(&current->list,&readyqueue);
+	}
+
+pick_next:
+	/* Let's pick a new process to run next */
+	if (!list_empty(&readyqueue)) {
+		next = list_first_entry(&readyqueue, struct process, list);
+		list_for_each_entry_safe(cur,curn,&readyqueue,list){
+			if(next->prio < cur->prio){
+				next->prio++;
+				next = cur;
+			}
+		}
+		list_del_init(&next->list);
+	}	
+
+	/* Return the next process to run */
+	return next;
+}
+
 struct scheduler pa_scheduler = {
 	.name = "Priority + aging",
+	.acquire = fcfs_acquire,
+	.release = fcfs_release,
+	.schedule = pa_schedule
 	/**
 	 * Implement your own acqure/release function to make priority
 	 * scheduler correct.
 	 */
 	/* Implement your own prio_schedule() and attach it here */
-
-
 };
+
 
 
 /***********************************************************************
  * Priority scheduler with priority ceiling protocol
  ***********************************************************************/
+static struct process *pcp_schedule(void){
+	struct process *next = NULL;
+	// dump_status();
+	struct process *cur = NULL;
+	struct process *curn = NULL;
+
+	if (!current || current->status == PROCESS_WAIT) {
+		goto pick_next;
+	}
+
+	/* The current process has remaining lifetime. Schedule it again */
+	if (current->age < current->lifespan) { 
+		list_add_tail(&current->list,&readyqueue);
+		// MAX_PRIO 이거 사용해서 priority를 높게 올려주기
+	}
+
+pick_next:
+	/* Let's pick a new process to run next */
+	if (!list_empty(&readyqueue)) {
+		next = list_first_entry(&readyqueue, struct process, list);
+		list_for_each_entry_safe(cur,curn,&readyqueue,list){
+			if(next->prio < cur->prio){
+				next = cur;
+			}
+		}
+		list_del_init(&next->list);
+	}	
+}
+
 struct scheduler pcp_scheduler = {
 	.name = "Priority + PCP Protocol",
+	.acquire = fcfs_acquire,
+	.release = fcfs_release,
+	.schedule = pcp_schedule
 	/**
 	 * Implement your own acqure/release function too to make priority
 	 * scheduler correct.
 	 */
+	};
 
-
-};
 
 
 /***********************************************************************
  * Priority scheduler with priority inheritance protocol
  ***********************************************************************/
+static struct process *pip_schedule(void){
+	struct process *next = NULL;
+	// dump_status();
+	struct process *cur = NULL;
+	struct process *curn = NULL;
+
+	if (!current || current->status == PROCESS_WAIT) {
+		goto pick_next;
+	}
+
+	if (current->age < current->lifespan) { 
+		list_add_tail(&current->list,&readyqueue);
+	}
+
+pick_next:
+	if (!list_empty(&readyqueue)) {
+		next = list_first_entry(&readyqueue, struct process, list);
+		list_for_each_entry_safe(cur,curn,&readyqueue,list){
+			if(next->prio < cur->prio){
+				next = cur;
+			}
+		}
+		list_del_init(&next->list);
+	}	
+
+	/* Return the next process to run */
+	return next;
+}
+
 struct scheduler pip_scheduler = {
 	.name = "Priority + PIP Protocol",
+	.acquire = fcfs_acquire,
+	.release = fcfs_release,
+	.schedule = pip_schedule
 	/**
 	 * Ditto
 	 */
-
-
-
 };
