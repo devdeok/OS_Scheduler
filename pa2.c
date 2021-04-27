@@ -317,12 +317,8 @@ struct scheduler srtf_scheduler = {
  * Round-robin scheduler
  ***********************************************************************/
 static struct process *rr_schedule(void){
-	/**
-	 * Implement your own SJF scheduler here.
-	 */
 	struct process *next = NULL;
 	// dump_status();
-
 	struct process *cur = NULL;
 	struct process *curn = NULL;
 
@@ -385,13 +381,9 @@ void prio_release(int resource_id){
 }
 
 static struct process *prio_schedule(void){  
-	/**
-	 * Implement your own SJF scheduler here.
-	 */
 	struct process *next = NULL;
 	// dump_status();
 	// acquire 1 0 2 -> 0번 했을 때 resource#1을 2 tick 사용
-	
 	struct process *cur = NULL;
 	struct process *curn = NULL;
 
@@ -446,15 +438,16 @@ static struct process *pa_schedule(void){
 		goto pick_next;
 	}
 
-	/* The current process has remaining lifetime. Schedule it again */
+	// 실행중인 process의 priority를 원래 priority로 되돌려 놓음
 	if (current->age < current->lifespan) { 
 		list_add_tail(&current->list,&readyqueue);
 		current->prio = current->prio_orig;
 	}
 
 	pick_next:
-		/* Let's pick a new process to run next */
 		if (!list_empty(&readyqueue)) {
+			// readyqueue에 있는 모든 process는 priority boost 1씩 받는다.
+			// scheduling될 process는 priority가 높은 process
 			next = list_first_entry(&readyqueue, struct process, list);
 			list_for_each_entry_safe(cur,curn,&readyqueue,list){
 				cur->prio++;
@@ -466,11 +459,10 @@ static struct process *pa_schedule(void){
 			list_del_init(&next->list);
 		}	
 
-	/* Return the next process to run */
 	return next;
 }
 
-// readyqueue에 있는 모든 process는 priority boost 1씩 받는다.
+
 struct scheduler pa_scheduler = {
 	.name = "Priority + aging",
 	.acquire = fcfs_acquire,
@@ -507,7 +499,7 @@ void pcp_release(int resource_id)
 	struct resource *r = resources + resource_id;
 	assert(r->owner == current);
 
-	r->owner->prio = r->owner->prio_orig;
+	current->prio = current->prio_orig;
 	r->owner = NULL;
 
 	if (!list_empty(&r->waitqueue)) {
@@ -545,8 +537,8 @@ bool pip_acquire(int resource_id){
 		r->owner = current;
 		return true;
 	}
-	current->status = PROCESS_WAIT;
 	r->owner->prio = current->prio;
+	current->status = PROCESS_WAIT;
 	list_add_tail(&current->list, &r->waitqueue);
 	return false;
 }
