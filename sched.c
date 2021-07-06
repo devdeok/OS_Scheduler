@@ -335,7 +335,7 @@ static void __do_simulation(void)
 		/* If the system ran a process in the previous tick, */
 		if (prev) {
 			/* Update the process status */
-			if (prev->status == PROCESS_RUNNING) {
+			if (prev->status == PROCESS_RUNNING) {  
 				prev->status = PROCESS_READY;
 			}
 

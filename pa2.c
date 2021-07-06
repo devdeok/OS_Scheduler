@@ -382,7 +382,7 @@ void prio_release(int resource_id){
 
 static struct process *prio_schedule(void){  
 	struct process *next = NULL;
-	// dump_status();
+	dump_status();
 	// acquire 1 0 2 -> 0번 했을 때 resource#1을 2 tick 사용
 	struct process *cur = NULL;
 	struct process *curn = NULL;
@@ -430,7 +430,7 @@ struct scheduler prio_scheduler = {
 
 static struct process *pa_schedule(void){
 	struct process *next = NULL;
-	// dump_status();
+	dump_status();
 	struct process *cur = NULL;
 	struct process *curn = NULL;
 
@@ -485,8 +485,8 @@ bool pcp_acquire(int resource_id){
 
 	// resource의 owner가 없음
 	if (!r->owner) {
-		r->owner = current;
 		current->prio=MAX_PRIO;
+		r->owner = current;
 		return true;
 	}
 	current->status = PROCESS_WAIT;
@@ -498,7 +498,6 @@ void pcp_release(int resource_id)
 {
 	struct resource *r = resources + resource_id;
 	assert(r->owner == current);
-
 	current->prio = current->prio_orig;
 	r->owner = NULL;
 
@@ -549,7 +548,7 @@ void pip_release(int resource_id){
 	struct process *cur, *curn;
 
 	assert(r->owner == current);
-	current->prio = current->prio_orig;
+	r->owner->prio = current->prio_orig;
 	r->owner = NULL;
 
 	// waitqueue에 있는 process들 중 제일 priority가 높은거 찾기
